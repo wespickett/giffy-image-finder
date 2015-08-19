@@ -1,6 +1,7 @@
 var express = require('express');
 var app = express();
 var http = require('http');
+var mysql = require('mysql');
 var server = http.Server(app);
 
 app.all('/', function(req, res, next) {
@@ -13,24 +14,43 @@ var options = {
   host: 'api.giphy.com'
 };
 
+//connect mysql
+var dbConnection = mysql.createConnection({
+  host     : '127.0.0.1',
+  user     : 'root',
+  password : 'password',
+  multipleStatements: true
+  //database : 'search-terms'
+});
+dbConnection.connect();
+
 app.get('/getGiffy', function(req,res) {
 
   var keyword = req.query.keyword || '';
 
-  options.path = '/v1/gifs/search?q=' + keyword + '&api_key=dc6zaTOxFJmzC&limit=1&offset=0';
+  dbConnection.query("SELECT * FROM `rhumbix-search`.`search-terms` WHERE `term` = ?", [keyword], function(err, result) {
 
-  http.get(options, function (response) {
+    if (result.length) {
+      options.path = '/v1/gifs/search?q=' + keyword + '&api_key=dc6zaTOxFJmzC&limit=1&offset=0';
 
-    var str = ''
-    response.on('data', function (chunk) {
-      str += chunk;
-    });
+      http.get(options, function (response) {
 
-    response.on('end', function () {
-      var responseObj = JSON.parse(str);
-      var gifImageObj = responseObj.data[0] || {}
-      res.jsonp(JSON.stringify(gifImageObj));
-    });
+        var str = ''
+        response.on('data', function (chunk) {
+          str += chunk;
+        });
+
+        response.on('end', function () {
+          var responseObj = JSON.parse(str);
+          var gifImageObj = responseObj.data[0] || {};
+          console.log(gifImageObj);
+          res.jsonp(JSON.stringify(gifImageObj));
+        });
+      });
+    } else {
+      res.jsonp(JSON.stringify({status:'fail', errorMsg:'term not allowed'}));
+    }
+
   });
 });
 
